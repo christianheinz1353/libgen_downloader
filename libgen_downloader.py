@@ -24,15 +24,15 @@ def get_books_and_authors(prompt):
 
     output = response.choices[0].text.strip()
 
-    pattern = r"([\w\s,:;!?&\-'\"\(\)]+) by ([\w\s,:\-'\"\(\)]+)"
-    matches = re.findall(pattern, output, re.MULTILINE)
+    # Assuming the output is in the format: 'Book Title, Author\nBook Title, Author\n...'
+    books_and_authors = output.split('\n')
 
-    if not matches:
-        print(f"No books and authors found in AI response: {output}")
-        return []
+    # Remove leading digits and strip whitespaces
+    books_and_authors = [re.sub(r'^\d+\.\s*', '', ba).split(' by ') for ba in books_and_authors]
 
-    # `matches` is a list of tuples in the form [(book1, author1), (book2, author2), ...]
-    books_and_authors = [list(match) for match in matches]
+    # Make sure author names are clean
+    for pair in books_and_authors:
+        pair[1] = pair[1].strip()  # Remove leading/trailing spaces
 
     return books_and_authors
 
