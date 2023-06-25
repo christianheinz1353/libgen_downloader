@@ -48,8 +48,8 @@ def create_libgen_url(book_title):
     
     return full_url
 
-def get_download_link(url, topic):
-    print(f"Retrieving download link for {topic}...")
+def get_download_link(url, book_title, topic):
+    print(f"Retrieving download link for {book_title}...")
     try:
         response = requests.get(url, timeout=10)
         response.raise_for_status()
@@ -64,7 +64,7 @@ def get_download_link(url, topic):
 
     if download_link_tag:
         download_link = download_link_tag['href']
-        download_status = download_file(download_link, topic)
+        download_status = download_file(download_link, book_title, topic)
         return download_status
     else:
         return "No download link found"
@@ -76,8 +76,8 @@ def sanitize_filename(filename):
     # Replace reserved characters with underscore
     return re.sub(r'[<>:"/\\|?*]', '_', filename)
 
-def download_file(download_link, topic):
-    print(f"Downloading file for {topic}...")
+def download_file(download_link, book_title, topic):
+    print(f"Downloading file for {book_title}...")
     # Sanitize the topic and limit it to 50 characters
     directory = sanitize_filename(topic)[:50]
     # Create directory if it doesn't exist
@@ -121,7 +121,7 @@ def download_file(download_link, topic):
     return file_path
 
 
-def scrape_libgen(book_title, author_name, fuzziness_threshold):
+def scrape_libgen(book_title, author_name, fuzziness_threshold, topic):
     print(f"Scraping Libgen for book titled '{book_title}' by author '{author_name}'...")
     url = create_libgen_url(book_title)
     
@@ -172,7 +172,7 @@ def scrape_libgen(book_title, author_name, fuzziness_threshold):
 
     # Adding the download link only for the matching rows
     print("Getting download links for matching results...")
-    matching_rows['Download link'] = matching_rows['Link'].apply(lambda link: get_download_link(link, book_title))
+    matching_rows['Download link'] = matching_rows['Link'].apply(lambda link: get_download_link(link, book_title, topic))
     
     print("Finished scraping and downloading files.")
     return matching_rows
@@ -180,6 +180,4 @@ def scrape_libgen(book_title, author_name, fuzziness_threshold):
 book_author_pairs = get_books_and_authors(prompt)
 
 for book, author in book_author_pairs:
-    scrape_libgen(book, author, fuzziness_threshold=70)
-
-
+    scrape_libgen(book, author, fuzziness_threshold, prompt)
