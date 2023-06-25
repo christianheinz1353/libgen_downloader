@@ -12,7 +12,17 @@ import re
 
 openai.api_key = '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'
 fuzziness_threshold = 70  # Adjust this value as needed
-prompt = "List of books on artificial intelligence:"
+
+def get_user_topic():
+    topic = input("Please enter your topic of interest: ")
+    formatted_prompt = f"Generate a list of book titles related to {topic} along with their authors, formatted as 'Book Title by Author Name':"
+    
+    directory = sanitize_filename(topic)[:50]
+    if not os.path.exists(directory):
+        os.makedirs(directory)
+        print(f"Created directory: {directory}")
+
+    return formatted_prompt, directory
 
 def get_books_and_authors(prompt):
     response = openai.Completion.create(
@@ -30,12 +40,14 @@ def get_books_and_authors(prompt):
     # Remove leading digits and strip whitespaces
     books_and_authors = [re.sub(r'^\d+\.\s*', '', ba).split(' by ') for ba in books_and_authors]
 
+    # Filter out any pairs with missing book title or author name
+    books_and_authors = [ba for ba in books_and_authors if len(ba) == 2 and ba[0] and ba[1]]
+
     # Make sure author names are clean
     for pair in books_and_authors:
         pair[1] = pair[1].strip()  # Remove leading/trailing spaces
 
     return books_and_authors
-
 
 def create_libgen_url(book_title):
     print("Creating Libgen URL...")
@@ -64,11 +76,11 @@ def get_download_link(url, book_title, topic):
 
     if download_link_tag:
         download_link = download_link_tag['href']
-        download_status = download_file(download_link, book_title, topic)
+        download_status = download_file(download_link, book_title, directory)
         return download_status
     else:
         return "No download link found"
-
+    
 def sanitize_filename(filename):
     """
     Function to sanitize a string to be used as a filename by removing or replacing invalid characters
@@ -172,12 +184,13 @@ def scrape_libgen(book_title, author_name, fuzziness_threshold, topic):
 
     # Adding the download link only for the matching rows
     print("Getting download links for matching results...")
-    matching_rows['Download link'] = matching_rows['Link'].apply(lambda link: get_download_link(link, book_title, topic))
-    
+    matching_rows['Download link'] = matching_rows['Link'].apply(lambda link: get_download_link(link, book_title, directory))
+
     print("Finished scraping and downloading files.")
     return matching_rows
 
-book_author_pairs = get_books_and_authors(prompt)
+formatted_prompt, directory = get_user_topic()
+book_author_pairs = get_books_and_authors(formatted_prompt)
 
 for book, author in book_author_pairs:
-    scrape_libgen(book, author, fuzziness_threshold, prompt)
+    scrape_libgen(book, author, fuzziness_threshold, directory)
