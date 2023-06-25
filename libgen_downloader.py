@@ -7,6 +7,8 @@ import openai
 from fuzzywuzzy import fuzz
 from tqdm import tqdm
 from urllib.parse import unquote
+import re
+
 
 openai.api_key = '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'
 fuzziness_threshold = 70  # Adjust this value as needed
@@ -22,11 +24,18 @@ def get_books_and_authors(prompt):
 
     output = response.choices[0].text.strip()
 
-    # Assuming the output is in the format: 'Book Title, Author\nBook Title, Author\n...'
-    books_and_authors = output.split('\n')
-    books_and_authors = [ba.split(', ') for ba in books_and_authors]
+    pattern = r"([\w\s,:;!?&\-'\"\(\)]+) by ([\w\s,:\-'\"\(\)]+)"
+    matches = re.findall(pattern, output, re.MULTILINE)
+
+    if not matches:
+        print(f"No books and authors found in AI response: {output}")
+        return []
+
+    # `matches` is a list of tuples in the form [(book1, author1), (book2, author2), ...]
+    books_and_authors = [list(match) for match in matches]
 
     return books_and_authors
+
 
 def create_libgen_url(book_title):
     print("Creating Libgen URL...")
