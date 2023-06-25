@@ -69,10 +69,18 @@ def get_download_link(url, topic):
     else:
         return "No download link found"
 
+def sanitize_filename(filename):
+    """
+    Function to sanitize a string to be used as a filename by removing or replacing invalid characters
+    """
+    # Replace reserved characters with underscore
+    return re.sub(r'[<>:"/\\|?*]', '_', filename)
+
 def download_file(download_link, topic):
     print(f"Downloading file for {topic}...")
+    # Sanitize the topic and limit it to 50 characters
+    directory = sanitize_filename(topic)[:50]
     # Create directory if it doesn't exist
-    directory = topic[:50]  # Limit the directory name to 50 characters
     if not os.path.exists(directory):
         os.makedirs(directory)
         print(f"Created directory: {directory}")
@@ -111,6 +119,7 @@ def download_file(download_link, topic):
     else:
         print(f"File '{filename}' downloaded successfully in directory: {os.path.abspath(directory)}.")
     return file_path
+
 
 def scrape_libgen(book_title, author_name, fuzziness_threshold):
     print(f"Scraping Libgen for book titled '{book_title}' by author '{author_name}'...")
