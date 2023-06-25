@@ -8,7 +8,7 @@ from fuzzywuzzy import fuzz
 from tqdm import tqdm
 from urllib.parse import unquote
 import re
-
+import langid
 
 openai.api_key = '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'
 fuzziness_threshold = 70  # Adjust this value as needed
@@ -35,16 +35,29 @@ def process_authors(authors_list):
 
 def get_user_topic():
     topic = input("Please enter your topic of interest: ")
-    formatted_prompt = f"Generate a list of book titles related to {topic} along with their authors, formatted as 'Book Title by Author Name':"
-    
+    lang, _ = langid.classify(topic)
+
+    language_dict = {
+        'en': {"name": "english", "prompt": "Generate a list of English book titles related to {} along with their authors, formatted as 'Book Title by Author Name':"},
+        'es': {"name": "spanish", "prompt": "Genera una lista de títulos de libros en español relacionados con {} junto con sus autores, en formato 'Título del libro por Nombre del autor':"},
+        'fr': {"name": "french", "prompt": "Générer une liste de titres de livres en français liés à {} avec leurs auteurs, formatés comme 'Titre du livre par Nom de l'auteur':"},
+        'de': {"name": "german", "prompt": "Erzeugen Sie eine Liste von Buchtiteln auf Deutsch, die sich auf {} beziehen, zusammen mit ihren Autoren, formatiert als 'Buchtitel von Autorname':"},
+        'it': {"name": "italian", "prompt": "Genera un elenco di titoli di libri in italiano relativi a {} insieme ai loro autori, formattati come 'Titolo del libro di Nome dell'autore':"},
+        # add more languages as needed...
+    }
+
+    language_data = language_dict.get(lang, language_dict['en'])  # Default to English template if language is not in dictionary
+    formatted_prompt = language_data["prompt"].format(topic)
+
     directory = sanitize_filename(topic)[:50]
     if not os.path.exists(directory):
         os.makedirs(directory)
         print(f"Created directory: {directory}")
 
-    return formatted_prompt, directory
+    return formatted_prompt, language_data["name"], directory
 
-def get_books_and_authors(prompt):
+
+def get_books_and_authors(prompt, language):
     response = openai.Completion.create(
         engine="text-davinci-002",
         prompt=prompt,
@@ -57,8 +70,14 @@ def get_books_and_authors(prompt):
     # Assuming the output is in the format: 'Book Title, Author\nBook Title, Author\n...'
     books_and_authors = output.split('\n')
 
+    # Dictionary for different language splitting terms
+    split_dict = {"english": "by", "spanish": "por", "french": "par", "german": "von", "italian": "da", "portuguese": "por"}
+
+    # Choose the splitting term based on the detected language
+    split_term = split_dict.get(language, "by")
+
     # Remove leading digits and strip whitespaces
-    books_and_authors = [re.sub(r'^\d+\.\s*', '', ba).split(' by ') for ba in books_and_authors]
+    books_and_authors = [re.sub(r'^\d+\.\s*', '', ba).split(f' {split_term} ') for ba in books_and_authors]
 
     # Filter out any pairs with missing book title or author name
     books_and_authors = [ba for ba in books_and_authors if len(ba) == 2 and ba[0] and ba[1]]
@@ -68,6 +87,7 @@ def get_books_and_authors(prompt):
         pair[1] = pair[1].strip()  # Remove leading/trailing spaces
 
     return books_and_authors
+
 
 def create_libgen_url(book_title):
     print("Creating Libgen URL...")
@@ -220,8 +240,12 @@ def scrape_libgen(book_title, author_name, fuzziness_threshold, directory, max_r
     print("Finished scraping and downloading files.")
     return matching_rows
 
-formatted_prompt, directory = get_user_topic()
-book_author_pairs = get_books_and_authors(formatted_prompt)
+# Retrieve the topic and language information
+formatted_prompt, language, directory = get_user_topic()
 
+# Retrieve the list of books and authors related to the topic
+book_author_pairs = get_books_and_authors(formatted_prompt, language)
+
+# Loop through the book-author pairs, scrape Libgen, and download the files
 for book, author in book_author_pairs:
     scrape_libgen(book, author, fuzziness_threshold, directory)
