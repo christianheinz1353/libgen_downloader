@@ -13,6 +13,26 @@ import re
 openai.api_key = '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'
 fuzziness_threshold = 70  # Adjust this value as needed
 
+def process_authors(authors_list):
+    """
+    Function to process author names to handle different formats
+    """
+    processed_authors = []
+
+    for author in authors_list:
+        if ',' in author:
+            # Handle the format "Surname, Name"
+            split_name = author.split(',')
+            author = f"{split_name[1].strip()} {split_name[0].strip()}"
+        elif '.' in author and ' ' not in author:
+            # Handle the format "N. Surname" - only if there are no spaces (to avoid affecting names like "J. K. Rowling")
+            split_name = author.split('.')
+            author = split_name[-1].strip()
+        # If author's name doesn't need processing, it stays the same
+        processed_authors.append(author)
+
+    return processed_authors
+
 def get_user_topic():
     topic = input("Please enter your topic of interest: ")
     formatted_prompt = f"Generate a list of book titles related to {topic} along with their authors, formatted as 'Book Title by Author Name':"
@@ -133,28 +153,26 @@ def download_file(download_link, book_title, topic):
     return file_path
 
 
-def scrape_libgen(book_title, author_name, fuzziness_threshold, topic):
+def scrape_libgen(book_title, author_name, fuzziness_threshold, directory, max_retries=3):
     print(f"Scraping Libgen for book titled '{book_title}' by author '{author_name}'...")
     url = create_libgen_url(book_title)
-    
+
     try:
         response = requests.get(url, timeout=10)
         response.raise_for_status()
     except (ConnectionError, Timeout, TooManyRedirects) as e:
         print(f"Error occurred when making request: {str(e)}")
         return "Error occurred"
-    
+
     soup = BeautifulSoup(response.text, 'html.parser')
-    
+
     table = soup.find('table', {'width': '100%', 'cellspacing': '1', 'cellpadding': '1', 'rules': 'rows', 'class': 'c', 'align': 'center'})
-    
+
     print("Processing search results...")
     rows = []
     for index, row in enumerate(table.find_all('tr')):
-        # Skip the first row
-        if index == 0:
+        if index == 0:  # Skip the first row
             continue
-
         columns = row.find_all('td')
         try:
             if columns:
@@ -173,14 +191,27 @@ def scrape_libgen(book_title, author_name, fuzziness_threshold, topic):
         except IndexError:
             print("A row was skipped due to insufficient columns.")
             continue
-    
+
     df = pd.DataFrame(rows, columns=["ID", "Authors", "Title", "Publisher", "Year", "Pages", "Language", "Size", "Format", "Link"])
-    
-    print("Filtering matching results...")
-    matching_rows = df[
-        df['Title'].apply(lambda title: fuzz.token_sort_ratio(title, book_title) >= fuzziness_threshold) &
-        df['Authors'].apply(lambda authors: any(fuzz.token_sort_ratio(author, author_name) >= fuzziness_threshold for author in authors))
-    ]
+
+    retries = 0
+    while retries < max_retries:
+        print("Filtering matching results...")
+        matching_rows = df[
+            df['Title'].apply(lambda title: fuzz.token_sort_ratio(title, book_title) >= fuzziness_threshold) &
+            df['Authors'].apply(lambda authors: any(fuzz.token_sort_ratio(process_author, author_name) >= fuzziness_threshold for process_author in process_authors(authors)))
+        ]
+
+        if matching_rows.empty:
+            print(f"No matches found for book titled '{book_title}' by author '{author_name}'. Trying with a shorter title...")
+            # Shorten the title, ensuring we don't split a word in half
+            book_title = ' '.join(book_title.split()[:-1])
+            if len(book_title.split()) < 3:
+                print(f"No matches found for book titled '{book_title}' by author '{author_name}'. Moving on to the next book.")
+                return
+            retries += 1
+        else:
+            break
 
     # Adding the download link only for the matching rows
     print("Getting download links for matching results...")
