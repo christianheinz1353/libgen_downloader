@@ -1,11 +1,32 @@
 import requests
+from requests.exceptions import ConnectionError, Timeout, TooManyRedirects
 from bs4 import BeautifulSoup
 import pandas as pd
 import os
+import openai
 from fuzzywuzzy import fuzz
 from tqdm import tqdm
 from urllib.parse import unquote
 
+openai.api_key = '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'
+fuzziness_threshold = 70  # Adjust this value as needed
+prompt = "List of books on artificial intelligence:"
+
+def get_books_and_authors(prompt):
+    response = openai.Completion.create(
+        engine="text-davinci-002",
+        prompt=prompt,
+        temperature=0.5,
+        max_tokens=200
+    )
+
+    output = response.choices[0].text.strip()
+
+    # Assuming the output is in the format: 'Book Title, Author\nBook Title, Author\n...'
+    books_and_authors = output.split('\n')
+    books_and_authors = [ba.split(', ') for ba in books_and_authors]
+
+    return books_and_authors
 
 def create_libgen_url(book_title):
     print("Creating Libgen URL...")
@@ -20,8 +41,12 @@ def create_libgen_url(book_title):
 
 def get_download_link(url, topic):
     print(f"Retrieving download link for {topic}...")
-    response = requests.get(url)
-    response.raise_for_status()
+    try:
+        response = requests.get(url, timeout=10)
+        response.raise_for_status()
+    except (ConnectionError, Timeout, TooManyRedirects) as e:
+        print(f"Error occurred when retrieving download link: {str(e)}")
+        return "Error occurred"
 
     soup = BeautifulSoup(response.text, 'html.parser')
 
@@ -43,8 +68,12 @@ def download_file(download_link, topic):
         os.makedirs(directory)
         print(f"Created directory: {directory}")
 
-    response = requests.get(download_link, stream=True)
-    response.raise_for_status()
+    try:
+        response = requests.get(download_link, stream=True, timeout=10)
+        response.raise_for_status()
+    except (ConnectionError, Timeout, TooManyRedirects) as e:
+        print(f"Error occurred when downloading file: {str(e)}")
+        return "Error occurred"
 
     # Parse the download_link to get the filename
     raw_filename = download_link.split('/')[-1]
@@ -58,11 +87,15 @@ def download_file(download_link, topic):
 
     t=tqdm(total=total_size, unit='iB', unit_scale=True)
 
-    with open(file_path, 'wb') as file:
-        for data in response.iter_content(block_size):
-            t.update(len(data))
-            file.write(data)
-    t.close()
+    try:
+        with open(file_path, 'wb') as file:
+            for data in response.iter_content(block_size):
+                t.update(len(data))
+                file.write(data)
+        t.close()
+    except Exception as e:
+        print(f"Error occurred when writing file: {str(e)}")
+        return "Error occurred"
 
     if total_size != 0 and t.n != total_size:
         print("Error, something went wrong with the download process.")
@@ -74,8 +107,12 @@ def scrape_libgen(book_title, author_name, fuzziness_threshold):
     print(f"Scraping Libgen for book titled '{book_title}' by author '{author_name}'...")
     url = create_libgen_url(book_title)
     
-    response = requests.get(url)
-    response.raise_for_status()
+    try:
+        response = requests.get(url, timeout=10)
+        response.raise_for_status()
+    except (ConnectionError, Timeout, TooManyRedirects) as e:
+        print(f"Error occurred when making request: {str(e)}")
+        return "Error occurred"
     
     soup = BeautifulSoup(response.text, 'html.parser')
     
@@ -122,7 +159,9 @@ def scrape_libgen(book_title, author_name, fuzziness_threshold):
     print("Finished scraping and downloading files.")
     return matching_rows
 
-book_title = input("Enter the book title: ")
-author_name = input("Enter the author name: ")
-fuzziness_threshold = 70  # Adjust this value as needed
-print(scrape_libgen(book_title, author_name, fuzziness_threshold))
+book_author_pairs = get_books_and_authors(prompt)
+
+for book, author in book_author_pairs:
+    scrape_libgen(book, author, fuzziness_threshold=70)
+
+
