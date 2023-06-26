@@ -57,7 +57,10 @@ def get_user_topic():
     return formatted_prompt, language_data["name"], directory
 
 
-def get_books_and_authors(prompt, language):
+def call_openai_api(prompt):
+    """
+    Function to call OpenAI API and return raw response
+    """
     response = openai.Completion.create(
         engine="text-davinci-002",
         prompt=prompt,
@@ -65,6 +68,12 @@ def get_books_and_authors(prompt, language):
         max_tokens=200
     )
 
+    return response
+
+def process_openai_response(response, language):
+    """
+    Function to process the response from OpenAI API
+    """
     output = response.choices[0].text.strip()
 
     # Assuming the output is in the format: 'Book Title, Author\nBook Title, Author\n...'
@@ -87,8 +96,6 @@ def get_books_and_authors(prompt, language):
         pair[1] = pair[1].strip()  # Remove leading/trailing spaces
 
     return books_and_authors
-
-
 def create_libgen_url(book_title):
     print("Creating Libgen URL...")
     base_url = "http://libgen.rs/search.php?req="
@@ -244,7 +251,8 @@ def scrape_libgen(book_title, author_name, fuzziness_threshold, directory, max_r
 formatted_prompt, language, directory = get_user_topic()
 
 # Retrieve the list of books and authors related to the topic
-book_author_pairs = get_books_and_authors(formatted_prompt, language)
+openai_response = call_openai_api(formatted_prompt)
+book_author_pairs = process_openai_response(openai_response, language)
 
 # Loop through the book-author pairs, scrape Libgen, and download the files
 for book, author in book_author_pairs:
