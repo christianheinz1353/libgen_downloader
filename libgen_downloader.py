@@ -13,6 +13,13 @@ import langid
 openai.api_key = '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'
 fuzziness_threshold = 70  # Adjust this value as needed
 
+def get_author_surname(author_name):
+    """
+    Function to extract surname from author's full name.
+    Assumes the surname is the last word in the name.
+    """
+    return author_name.split()[-1]
+
 def process_authors(authors_list):
     """
     Function to process author names to handle different formats
@@ -179,7 +186,6 @@ def download_file(download_link, book_title, topic):
         print(f"File '{filename}' downloaded successfully in directory: {os.path.abspath(directory)}.")
     return file_path
 
-
 def scrape_libgen(book_title, author_name, fuzziness_threshold, directory, max_retries=3):
     print(f"Scraping Libgen for book titled '{book_title}' by author '{author_name}'...")
     url = create_libgen_url(book_title)
@@ -224,13 +230,16 @@ def scrape_libgen(book_title, author_name, fuzziness_threshold, directory, max_r
     retries = 0
     while retries < max_retries:
         print("Filtering matching results...")
-        matching_rows = df[
-            df['Title'].apply(lambda title: fuzz.token_sort_ratio(title, book_title) >= fuzziness_threshold) &
-            df['Authors'].apply(lambda authors: any(fuzz.token_sort_ratio(process_author, author_name) >= fuzziness_threshold for process_author in process_authors(authors)))
-        ]
-
+        author_surname = get_author_surname(author_name)
+        for author_variant in [author_name, author_surname]:
+            matching_rows = df[
+                df['Title'].apply(lambda title: fuzz.token_sort_ratio(title, book_title) >= fuzziness_threshold) &
+                df['Authors'].apply(lambda authors: any(fuzz.token_sort_ratio(process_author, author_variant) >= fuzziness_threshold for process_author in process_authors(authors)))
+            ]
+            if not matching_rows.empty:
+                break
         if matching_rows.empty:
-            print(f"No matches found for book titled '{book_title}' by author '{author_name}'. Trying with a shorter title...")
+            print(f"No matches found for book titled '{book_title}' by author '{author_name}'. Trying with a shorter title and author surname...")
             # Shorten the title, ensuring we don't split a word in half
             book_title = ' '.join(book_title.split()[:-1])
             if len(book_title.split()) < 3:
