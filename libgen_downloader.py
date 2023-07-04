@@ -9,8 +9,19 @@ from tqdm import tqdm
 from urllib.parse import unquote
 import re
 import langid
+import time
 
-openai.api_key = 'YOUR-OPENAI-API-KEY'
+from dotenv import load_dotenv
+
+# load environment variables from .env file
+load_dotenv()
+
+# get the API key
+openai_api_key = os.getenv('OPENAI_API_KEY')
+
+# set the API key
+openai.api_key = openai_api_key
+
 fuzziness_threshold = 70  # Adjust this value as needed
 
 def get_author_surname(author_name):
@@ -197,6 +208,8 @@ def scrape_libgen(book_title, author_name, fuzziness_threshold, directory, max_r
         print(f"Error occurred when making request: {str(e)}")
         return "Error occurred"
 
+    time.sleep(5)  # add delay
+
     soup = BeautifulSoup(response.text, 'html.parser')
 
     table = soup.find('table', {'width': '100%', 'cellspacing': '1', 'cellpadding': '1', 'rules': 'rows', 'class': 'c', 'align': 'center'})
@@ -246,15 +259,18 @@ def scrape_libgen(book_title, author_name, fuzziness_threshold, directory, max_r
                 print(f"No matches found for book titled '{book_title}' by author '{author_name}'. Moving on to the next book.")
                 return
             retries += 1
+            time.sleep(5)  # add delay between retries
         else:
             break
 
     # Adding the download link only for the matching rows
-    print("Getting download links for matching results...")
-    matching_rows['Download link'] = matching_rows['Link'].apply(lambda link: get_download_link(link, book_title, directory))
+    print("Getting download links for matching rows...")
+    matching_rows['Download Link'] = matching_rows['Link'].apply(get_download_link)
+    
+    # saving the dataframe to a CSV file
+    matching_rows.to_csv(os.path.join(directory, f"{book_title}_{author_name}.csv"), index=False)
+    print(f"Successfully scraped data for book titled '{book_title}' by author '{author_name}'.")
 
-    print("Finished scraping and downloading files.")
-    return matching_rows
 
 # Retrieve the topic and language information
 formatted_prompt, language, directory = get_user_topic()
