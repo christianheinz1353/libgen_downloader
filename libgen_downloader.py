@@ -10,7 +10,7 @@ from urllib.parse import unquote
 import re
 import langid
 
-openai.api_key = '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'
+openai.api_key = 'YOUR-OPENAI-API-KEY'
 fuzziness_threshold = 70  # Adjust this value as needed
 
 def get_author_surname(author_name):
