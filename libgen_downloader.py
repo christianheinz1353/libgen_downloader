@@ -18,6 +18,7 @@ load_dotenv()
 
 # get the API key
 openai_api_key = os.getenv('OPENAI_API_KEY')
+fuzziness_threshold = int(os.getenv('FUZZINESS_THRESHOLD', 70))  # Default value is 70 if not provided in the .env file
 
 # set the API key
 openai.api_key = openai_api_key
