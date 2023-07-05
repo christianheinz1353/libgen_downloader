@@ -266,7 +266,8 @@ def scrape_libgen(book_title, author_name, fuzziness_threshold, directory, max_r
 
     # Adding the download link only for the matching rows
     print("Getting download links for matching rows...")
-    matching_rows['Download Link'] = matching_rows['Link'].apply(get_download_link)
+
+    matching_rows['Download Link'] = matching_rows.apply(lambda row: get_download_link(row['Link'], row['Title'], row['Authors']), axis=1)
     
     # saving the dataframe to a CSV file
     matching_rows.to_csv(os.path.join(directory, f"{book_title}_{author_name}.csv"), index=False)
