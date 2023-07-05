@@ -14,7 +14,7 @@ import time
 from dotenv import load_dotenv
 
 # load environment variables from .env file
-load_dotenv()
+load_dotenv('config.env')  # take environment variables from .env.
 
 # get the API key
 openai_api_key = os.getenv('OPENAI_API_KEY')
